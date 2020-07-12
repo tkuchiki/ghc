@@ -4,28 +4,37 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"gopkg.in/alecthomas/kingpin.v2"
 	"io"
 	"log"
 	"os"
+
+	"gopkg.in/alecthomas/kingpin.v2"
 
 	"github.com/google/go-github/github"
 	"golang.org/x/oauth2"
 )
 
-func comment(noCodeBlock bool, header, body string) string {
+func comment(noCodeBlock, noDetails bool, header, body string) string {
+	var details string
 	var comment string
+
 	if header != "" {
 		header = fmt.Sprintf("# %s\n", header)
 	}
 
 	if noCodeBlock {
-		comment = fmt.Sprintf("%s%s", header, body)
+		comment = body
 	} else {
-		comment = fmt.Sprintf("%s```\n%s\n```", header, body)
+		comment = fmt.Sprintf("```\n%s\n```", body)
 	}
 
-	return comment
+	if noDetails {
+		details = comment
+	} else {
+		details = fmt.Sprintf("\n<details>\n\n%s\n\n</details>", comment)
+	}
+
+	return fmt.Sprintf(`%s%s`, header, details)
 }
 
 func main() {
@@ -34,6 +43,7 @@ func main() {
 	number := kingpin.Flag("number", "GitHub issue number").Required().Int()
 	header := kingpin.Flag("header", "GitHub issue comment header").String()
 	noCodeBlock := kingpin.Flag("no-code-block", "no code block").Bool()
+	noDetails := kingpin.Flag("no-details", "no details tag").Bool()
 	kingpin.Parse()
 
 	token := os.Getenv("GITHUB_TOKEN")
@@ -56,7 +66,7 @@ func main() {
 		if err != nil && err != io.EOF {
 			log.Fatal(err)
 		}
-		body := comment(*noCodeBlock,  *header, buf.String())
+		body := comment(*noCodeBlock, *noDetails, *header, buf.String())
 		comment := &github.IssueComment{
 			Body: &body,
 		}
